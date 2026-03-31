@@ -91,12 +91,12 @@ _TABLES = [
 def get_conn():
     """Open a connection and ensure all tables exist."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
+    # isolation_level=None = autocommit — every statement commits immediately
+    conn = sqlite3.connect(str(DB_PATH), isolation_level=None)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
     for sql in _TABLES:
         conn.execute(sql)
-    conn.commit()
+    print(f"[db] connected to {DB_PATH}")
     return conn
 
 
