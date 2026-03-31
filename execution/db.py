@@ -12,99 +12,98 @@ from pathlib import Path
 _default = Path(__file__).parent.parent / ".tmp" / "lawbot.db"
 DB_PATH = Path(os.environ.get("DB_PATH", str(_default)))
 
+_TABLES = [
+    """CREATE TABLE IF NOT EXISTS cases (
+        id         TEXT PRIMARY KEY,
+        user_phone TEXT NOT NULL,
+        status     TEXT NOT NULL DEFAULT 'intake',
+        case_json  TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""",
+    """CREATE TABLE IF NOT EXISTS messages (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        case_id    TEXT NOT NULL,
+        role       TEXT NOT NULL,
+        content    TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (case_id) REFERENCES cases(id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS lawyers (
+        id              TEXT PRIMARY KEY,
+        case_id         TEXT NOT NULL,
+        name            TEXT,
+        firm            TEXT,
+        phone           TEXT,
+        address         TEXT,
+        city            TEXT,
+        state           TEXT,
+        practice_areas  TEXT,
+        google_place_id TEXT,
+        rating          REAL,
+        call_status     TEXT DEFAULT 'pending',
+        created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (case_id) REFERENCES cases(id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS call_responses (
+        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        lawyer_id             TEXT NOT NULL,
+        case_id               TEXT NOT NULL,
+        will_take_case        TEXT,
+        fee_structure         TEXT,
+        fee_range             TEXT,
+        case_assessment       TEXT,
+        next_steps            TEXT,
+        contact_preference    TEXT,
+        contact_detail        TEXT,
+        notes                 TEXT,
+        call_duration_seconds INTEGER,
+        recording_url         TEXT,
+        twilio_call_sid       TEXT,
+        full_transcript       TEXT,
+        created_at            DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (lawyer_id) REFERENCES lawyers(id),
+        FOREIGN KEY (case_id)   REFERENCES cases(id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS lawyer_reviews (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        google_place_id TEXT NOT NULL,
+        lawyer_name     TEXT NOT NULL,
+        case_id         TEXT NOT NULL,
+        user_phone      TEXT NOT NULL,
+        rating          INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+        outcome         TEXT,
+        comment         TEXT,
+        practice_area   TEXT,
+        created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (case_id) REFERENCES cases(id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS scheduled_followups (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_phone TEXT NOT NULL,
+        case_id    TEXT NOT NULL,
+        send_at    DATETIME NOT NULL,
+        sent       INTEGER DEFAULT 0
+    )""",
+]
+
 
 def get_conn():
+    """Open a connection and ensure all tables exist."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    for sql in _TABLES:
+        conn.execute(sql)
+    conn.commit()
     return conn
 
 
 def init_db():
-    """Create all tables if they don't exist."""
-    print(f"[db] Initializing database at {DB_PATH}")
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        tables = [
-            """CREATE TABLE IF NOT EXISTS cases (
-                id          TEXT PRIMARY KEY,
-                user_phone  TEXT NOT NULL,
-                status      TEXT NOT NULL DEFAULT 'intake',
-                case_json   TEXT,
-                created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-            )""",
-            """CREATE TABLE IF NOT EXISTS messages (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                case_id     TEXT NOT NULL,
-                role        TEXT NOT NULL,
-                content     TEXT NOT NULL,
-                created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (case_id) REFERENCES cases(id)
-            )""",
-            """CREATE TABLE IF NOT EXISTS lawyers (
-                id              TEXT PRIMARY KEY,
-                case_id         TEXT NOT NULL,
-                name            TEXT,
-                firm            TEXT,
-                phone           TEXT,
-                address         TEXT,
-                city            TEXT,
-                state           TEXT,
-                practice_areas  TEXT,
-                google_place_id TEXT,
-                rating          REAL,
-                call_status     TEXT DEFAULT 'pending',
-                created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (case_id) REFERENCES cases(id)
-            )""",
-            """CREATE TABLE IF NOT EXISTS call_responses (
-                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
-                lawyer_id               TEXT NOT NULL,
-                case_id                 TEXT NOT NULL,
-                will_take_case          TEXT,
-                fee_structure           TEXT,
-                fee_range               TEXT,
-                case_assessment         TEXT,
-                next_steps              TEXT,
-                contact_preference      TEXT,
-                contact_detail          TEXT,
-                notes                   TEXT,
-                call_duration_seconds   INTEGER,
-                recording_url           TEXT,
-                twilio_call_sid         TEXT,
-                full_transcript         TEXT,
-                created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (lawyer_id) REFERENCES lawyers(id),
-                FOREIGN KEY (case_id) REFERENCES cases(id)
-            )""",
-
-            -- Tracks real-world outcomes: did the lawyer work out?
-            -- Keyed by google_place_id so reviews accumulate across all cases.
-            """CREATE TABLE IF NOT EXISTS lawyer_reviews (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                google_place_id TEXT NOT NULL,
-                lawyer_name     TEXT NOT NULL,
-                case_id         TEXT NOT NULL,
-                user_phone      TEXT NOT NULL,
-                rating          INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
-                outcome         TEXT,
-                comment         TEXT,
-                practice_area   TEXT,
-                created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (case_id) REFERENCES cases(id)
-            )""",
-        ]
-        for sql in tables:
-            conn.execute(sql)
-        conn.commit()
-        conn.close()
-        print(f"[db] Database initialized OK at {DB_PATH}")
-    except Exception as e:
-        print(f"[db] ERROR initializing database: {e}")
-        raise
+    """No-op — tables are created automatically in get_conn()."""
+    get_conn().close()
+    print(f"[db] Database ready at {DB_PATH}")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
