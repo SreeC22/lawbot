@@ -15,7 +15,7 @@ Stored in lawyer_reviews keyed by google_place_id — accumulates across all use
 import os
 import json
 from dotenv import load_dotenv
-import anthropic
+from openai import OpenAI
 from db import (
     get_conn, save_lawyer_review, get_lawyer_score,
     get_active_case, add_message, get_messages
@@ -24,8 +24,10 @@ from notifier import send_message
 
 load_dotenv()
 
-client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-MODEL = "claude-opus-4-6"
+MODEL = "gpt-4o"
+
+def _get_client():
+    return OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
 
 # In-memory state for users currently in feedback flow
 # { user_phone: { "state": "awaiting_lawyer_choice"|"awaiting_rating"|"awaiting_outcome"|"awaiting_comment", ...} }

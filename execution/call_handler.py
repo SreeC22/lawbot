@@ -9,13 +9,15 @@ import os
 import json
 from dotenv import load_dotenv
 from twilio.twiml.voice_response import VoiceResponse, Gather
-import anthropic
+from openai import OpenAI
 from db import get_conn
 
 load_dotenv()
 
-client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-MODEL = "claude-opus-4-6"
+MODEL = "gpt-4o"
+
+def _get_client():
+    return OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
 
 # Conversation state stored in-memory per call SID (short-lived, call duration only)
 # For production, replace with Redis
@@ -185,13 +187,13 @@ def _generate_response(state: dict) -> str:
             "content": f"[SYSTEM: Also need to collect fee structure, case assessment, and next steps. Case details: {json.dumps(case_data)}]"
         })
 
-    response = client.messages.create(
+    full_messages = [{"role": "system", "content": CALL_SYSTEM_PROMPT}] + messages
+    response = _get_client().chat.completions.create(
         model=MODEL,
         max_tokens=256,
-        system=CALL_SYSTEM_PROMPT,
-        messages=messages
+        messages=full_messages
     )
-    return response.content[0].text
+    return response.choices[0].message.content
 
 
 def _save_response_data(case_id: str, lawyer_id: str, raw_text: str, history: list):

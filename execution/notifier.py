@@ -10,15 +10,12 @@ from twilio.rest import Client
 
 load_dotenv()
 
-TWILIO_ACCOUNT_SID  = os.environ["TWILIO_ACCOUNT_SID"]
-TWILIO_AUTH_TOKEN   = os.environ["TWILIO_AUTH_TOKEN"]
-TWILIO_PHONE_NUMBER = os.environ["TWILIO_PHONE_NUMBER"]   # SMS fallback
-TWILIO_WHATSAPP_NUMBER = os.environ.get(
-    "TWILIO_WHATSAPP_NUMBER",
-    f"whatsapp:{TWILIO_PHONE_NUMBER}"
-)
-
-twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+def _get_twilio():
+    sid    = os.environ.get("TWILIO_ACCOUNT_SID", "")
+    token  = os.environ.get("TWILIO_AUTH_TOKEN", "")
+    phone  = os.environ.get("TWILIO_PHONE_NUMBER", "")
+    wa     = os.environ.get("TWILIO_WHATSAPP_NUMBER", f"whatsapp:{phone}")
+    return Client(sid, token), phone, wa
 
 
 def send_message(to_phone: str, body: str, prefer_whatsapp: bool = True):
@@ -41,18 +38,16 @@ def send_message(to_phone: str, body: str, prefer_whatsapp: bool = True):
 
 
 def _send_whatsapp(to_phone: str, body: str):
+    client, _, wa_number = _get_twilio()
     to = f"whatsapp:{_normalize(to_phone)}"
-    msg = twilio_client.messages.create(
-        from_=TWILIO_WHATSAPP_NUMBER,
-        to=to,
-        body=body
-    )
+    msg = client.messages.create(from_=wa_number, to=to, body=body)
     print(f"[notifier] WhatsApp sent to {to_phone} | SID: {msg.sid}")
 
 
 def _send_sms(to_phone: str, body: str):
-    msg = twilio_client.messages.create(
-        from_=TWILIO_PHONE_NUMBER,
+    client, phone_number, _ = _get_twilio()
+    msg = client.messages.create(
+        from_=phone_number,
         to=_normalize(to_phone),
         body=body
     )
