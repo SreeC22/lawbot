@@ -23,28 +23,28 @@ def get_conn():
 
 def init_db():
     """Create all tables if they don't exist."""
-    with get_conn() as conn:
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS cases (
+    print(f"[db] Initializing database at {DB_PATH}")
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        tables = [
+            """CREATE TABLE IF NOT EXISTS cases (
                 id          TEXT PRIMARY KEY,
                 user_phone  TEXT NOT NULL,
                 status      TEXT NOT NULL DEFAULT 'intake',
-                -- status: intake | researching | calling | complete
-                case_json   TEXT,          -- structured case summary (JSON)
+                case_json   TEXT,
                 created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS messages (
+            )""",
+            """CREATE TABLE IF NOT EXISTS messages (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 case_id     TEXT NOT NULL,
-                role        TEXT NOT NULL,  -- 'user' or 'assistant'
+                role        TEXT NOT NULL,
                 content     TEXT NOT NULL,
                 created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (case_id) REFERENCES cases(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS lawyers (
+            )""",
+            """CREATE TABLE IF NOT EXISTS lawyers (
                 id              TEXT PRIMARY KEY,
                 case_id         TEXT NOT NULL,
                 name            TEXT,
@@ -53,20 +53,18 @@ def init_db():
                 address         TEXT,
                 city            TEXT,
                 state           TEXT,
-                practice_areas  TEXT,       -- comma-separated
+                practice_areas  TEXT,
                 google_place_id TEXT,
                 rating          REAL,
                 call_status     TEXT DEFAULT 'pending',
-                -- pending | calling | answered | no_answer | declined | unreachable
                 created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (case_id) REFERENCES cases(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS call_responses (
+            )""",
+            """CREATE TABLE IF NOT EXISTS call_responses (
                 id                      INTEGER PRIMARY KEY AUTOINCREMENT,
                 lawyer_id               TEXT NOT NULL,
                 case_id                 TEXT NOT NULL,
-                will_take_case          TEXT,   -- 'yes' | 'no' | 'maybe'
+                will_take_case          TEXT,
                 fee_structure           TEXT,
                 fee_range               TEXT,
                 case_assessment         TEXT,
@@ -81,25 +79,32 @@ def init_db():
                 created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (lawyer_id) REFERENCES lawyers(id),
                 FOREIGN KEY (case_id) REFERENCES cases(id)
-            );
+            )""",
 
             -- Tracks real-world outcomes: did the lawyer work out?
             -- Keyed by google_place_id so reviews accumulate across all cases.
-            CREATE TABLE IF NOT EXISTS lawyer_reviews (
+            """CREATE TABLE IF NOT EXISTS lawyer_reviews (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                google_place_id TEXT NOT NULL,   -- links to lawyers.google_place_id
+                google_place_id TEXT NOT NULL,
                 lawyer_name     TEXT NOT NULL,
                 case_id         TEXT NOT NULL,
                 user_phone      TEXT NOT NULL,
                 rating          INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
-                outcome         TEXT,            -- 'won' | 'settled' | 'lost' | 'dropped' | 'still_ongoing' | 'just_consulted'
+                outcome         TEXT,
                 comment         TEXT,
                 practice_area   TEXT,
                 created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (case_id) REFERENCES cases(id)
-            );
-        """)
-    print(f"Database initialized at {DB_PATH}")
+            )""",
+        ]
+        for sql in tables:
+            conn.execute(sql)
+        conn.commit()
+        conn.close()
+        print(f"[db] Database initialized OK at {DB_PATH}")
+    except Exception as e:
+        print(f"[db] ERROR initializing database: {e}")
+        raise
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
