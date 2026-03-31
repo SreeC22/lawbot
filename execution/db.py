@@ -9,8 +9,8 @@ from pathlib import Path
 
 # Railway: set DB_PATH env var to a mounted volume path e.g. /data/lawbot.db
 # Locally: defaults to .tmp/lawbot.db
-_default = Path(__file__).parent.parent / ".tmp" / "lawbot.db"
-DB_PATH = Path(os.environ.get("DB_PATH", str(_default)))
+# Default to /tmp which is always writable on any server
+DB_PATH = Path(os.environ.get("DB_PATH", "/tmp/lawbot.db"))
 
 _TABLES = [
     """CREATE TABLE IF NOT EXISTS cases (
@@ -91,11 +91,11 @@ _TABLES = [
 def get_conn():
     """Open a connection and ensure all tables exist."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    # isolation_level=None = autocommit — every statement commits immediately
-    conn = sqlite3.connect(str(DB_PATH), isolation_level=None)
+    conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     for sql in _TABLES:
         conn.execute(sql)
+    conn.commit()
     print(f"[db] connected to {DB_PATH}")
     return conn
 
