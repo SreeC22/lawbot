@@ -28,8 +28,12 @@ from call_handler import (
     handle_call_status,
 )
 from feedback_handler import handle_feedback_message
+from db import init_db
 
 load_dotenv()
+
+# Initialize database tables on startup
+init_db()
 
 app = Flask(__name__)
 VALIDATE_TWILIO = os.environ.get("VALIDATE_TWILIO_SIGNATURE", "true").lower() == "true"
