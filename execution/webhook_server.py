@@ -68,7 +68,12 @@ def sms_webhook():
     if not from_number or not body:
         return Response("", status=200)
 
-    reply = _route_message(from_number, body)
+    try:
+        reply = _route_message(from_number, body)
+    except Exception as e:
+        import traceback
+        print(f"[sms] ERROR: {e}\n{traceback.format_exc()}")
+        reply = "Sorry, something went wrong on my end. I'm looking into it!"
 
     # Respond via TwiML
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -91,7 +96,13 @@ def whatsapp_webhook():
 
     # Normalize: strip "whatsapp:" prefix for internal use
     user_phone = from_number.replace("whatsapp:", "")
-    reply = _route_message(user_phone, body)
+
+    try:
+        reply = _route_message(user_phone, body)
+    except Exception as e:
+        import traceback
+        print(f"[whatsapp] ERROR: {e}\n{traceback.format_exc()}")
+        reply = "Sorry, something went wrong on my end. I'm looking into it!"
 
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response><Message>{_escape_xml(reply)}</Message></Response>"""
