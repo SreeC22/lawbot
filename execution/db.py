@@ -204,5 +204,8 @@ def get_lawyer_score(google_place_id: str) -> dict:
     }
 
 
+# Auto-initialize tables whenever this module is imported
+init_db()
+
 if __name__ == "__main__":
     init_db()
