@@ -8,13 +8,15 @@ import os
 import json
 import uuid
 from dotenv import load_dotenv
-import anthropic
+from openai import OpenAI
 from db import get_conn, get_active_case, get_messages, add_message, update_case
 
 load_dotenv()
 
-client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-MODEL = "claude-opus-4-6"
+MODEL = "gpt-4o"
+
+def _get_client():
+    return OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
 
 SYSTEM_PROMPT = """You are a warm, professional AI legal intake agent named Lex.
 You help people find the right lawyer by understanding their legal situation through conversation.
@@ -78,18 +80,16 @@ def handle_incoming_message(user_phone: str, user_message: str) -> str:
     # Store the user's message
     add_message(case_id, "user", user_message)
 
-    # Build message history for Claude
-    history = get_messages(case_id)
+    # Build message history for OpenAI (system message first)
+    history = [{"role": "system", "content": SYSTEM_PROMPT}] + get_messages(case_id)
 
-    # Call Claude
-    response = client.messages.create(
+    response = _get_client().chat.completions.create(
         model=MODEL,
         max_tokens=1024,
-        system=SYSTEM_PROMPT,
         messages=history
     )
 
-    reply = response.content[0].text
+    reply = response.choices[0].message.content
 
     # Store assistant reply
     add_message(case_id, "assistant", reply)

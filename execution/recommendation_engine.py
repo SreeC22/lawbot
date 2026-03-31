@@ -7,14 +7,16 @@ and generate a clear recommendation. Sends the report to the user.
 import os
 import json
 from dotenv import load_dotenv
-import anthropic
+from openai import OpenAI
 from db import get_conn, update_case, get_lawyer_score
 from notifier import send_message
 
 load_dotenv()
 
-client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-MODEL = "claude-opus-4-6"
+MODEL = "gpt-4o"
+
+def _get_client():
+    return OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
 
 
 def generate_recommendation(case_id: str):
@@ -159,12 +161,12 @@ Keep it concise. Use WhatsApp formatting (*bold*, not markdown headers).
 If only 1 lawyer, skip the numbering and just give the info + recommend them directly.
 Only show the internal review line if there are actual reviews."""
 
-    response = client.messages.create(
+    response = _get_client().chat.completions.create(
         model=MODEL,
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}]
     )
-    return response.content[0].text
+    return response.choices[0].message.content
 
 
 def _schedule_feedback_followup(user_phone: str, case_id: str):

@@ -32,9 +32,12 @@ from feedback_handler import handle_feedback_message
 load_dotenv()
 
 app = Flask(__name__)
-validator = RequestValidator(os.environ["TWILIO_AUTH_TOKEN"])
-
 VALIDATE_TWILIO = os.environ.get("VALIDATE_TWILIO_SIGNATURE", "true").lower() == "true"
+
+
+def _get_validator():
+    """Lazy-load so missing env var doesn't crash startup."""
+    return RequestValidator(os.environ.get("TWILIO_AUTH_TOKEN", ""))
 
 
 @app.route("/health", methods=["GET"])
@@ -49,7 +52,7 @@ def _validate_twilio(req):
     signature = req.headers.get("X-Twilio-Signature", "")
     url = req.url
     params = req.form.to_dict()
-    return validator.validate(url, params, signature)
+    return _get_validator().validate(url, params, signature)
 
 
 # ── SMS ───────────────────────────────────────────────────────────────────────

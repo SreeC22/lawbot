@@ -13,12 +13,14 @@ from db import get_conn, get_lawyers_for_case, update_case
 
 load_dotenv()
 
-TWILIO_ACCOUNT_SID   = os.environ["TWILIO_ACCOUNT_SID"]
-TWILIO_AUTH_TOKEN    = os.environ["TWILIO_AUTH_TOKEN"]
-TWILIO_PHONE_NUMBER  = os.environ["TWILIO_PHONE_NUMBER"]   # your Twilio number
-WEBHOOK_BASE_URL     = os.environ["WEBHOOK_BASE_URL"]       # e.g. https://yourapp.railway.app
-
-twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+def _get_twilio():
+    client = Client(
+        os.environ.get("TWILIO_ACCOUNT_SID", ""),
+        os.environ.get("TWILIO_AUTH_TOKEN", "")
+    )
+    phone       = os.environ.get("TWILIO_PHONE_NUMBER", "")
+    webhook_url = os.environ.get("WEBHOOK_BASE_URL", "")
+    return client, phone, webhook_url
 
 SECONDS_BETWEEN_CALLS = 120   # 2 minutes between calls
 MAX_ATTEMPTS_PER_LAWYER = 3
@@ -55,9 +57,11 @@ def _call_lawyer(case_id: str, lawyer: dict):
         _set_lawyer_status(lawyer_id, "unreachable")
         return
 
+    twilio_client, twilio_phone, base_url = _get_twilio()
+
     # The webhook URL carries context so the call handler knows what to say
     webhook_url = (
-        f"{WEBHOOK_BASE_URL}/call/start"
+        f"{base_url}/call/start"
         f"?case_id={case_id}&lawyer_id={lawyer_id}"
     )
 
@@ -66,11 +70,11 @@ def _call_lawyer(case_id: str, lawyer: dict):
     try:
         call = twilio_client.calls.create(
             to=phone_e164,
-            from_=TWILIO_PHONE_NUMBER,
+            from_=twilio_phone,
             url=webhook_url,
-            status_callback=f"{WEBHOOK_BASE_URL}/call/status",
+            status_callback=f"{base_url}/call/status",
             status_callback_event=["completed", "no-answer", "failed", "busy"],
-            timeout=30,           # ring for 30 seconds
+            timeout=30,
             record=True,
         )
         _set_lawyer_status(lawyer_id, "calling", twilio_call_sid=call.sid)
